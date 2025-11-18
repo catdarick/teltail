@@ -51,7 +51,11 @@ pip install .
 
 ## Configuration
 
-Before the first use you need to configure your Telegram bot token and chat id:
+Before the first use, you need to create a Telegram bot and get your chat ID.
+You can follow [this guide](https://gist.github.com/nafiesl/4ad622f344cd1dc3bb1ecbe468ff9f8a)
+to learn how to get your bot API token and chat ID.
+
+Once you have those, configure `teltail`:
 
 ```bash
 teltail --configure
