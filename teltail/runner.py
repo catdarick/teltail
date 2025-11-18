@@ -53,16 +53,17 @@ async def run_with_notifications(config: Config, argv: Iterable[str]) -> int:
 
     client = TelegramClient(config.telegram.bot_token)
 
-    # Initial header and message send. Child must not start if this fails.
-    header = header_builder.build_header("running", command_argv, defaults.max_message_length)
-    initial_text = header + "\nStarting..."
+    # Initial message send. Child must not start if this fails.
+    # Use the same layout as live messages, but with an empty tail.
     from .length_utils import tg_len, tg_truncate_middle
+
+    initial_text = LiveMessageBuilder(defaults).build_live_text("running", command_argv, buffer_text="")
 
     if tg_len(initial_text) > defaults.max_message_length:
         initial_text = tg_truncate_middle(initial_text, defaults.max_message_length)
 
     try:
-        message = client.send_message(config.telegram.chat_id, initial_text)
+        message = client.send_message(config.telegram.chat_id, initial_text, parse_mode="Markdown")
     except TelegramError as exc:
         print(f"[teltail] failed to send initial Telegram message: {exc}", file=sys.stderr)
         print("[teltail] check your configuration or run 'teltail --configure'", file=sys.stderr)
@@ -121,7 +122,7 @@ async def run_with_notifications(config: Config, argv: Iterable[str]) -> int:
                 buffer_text = tail_buffer.get_full_text()
                 text = live_builder.build_live_text("running", command_argv, buffer_text)
                 if text != last_sent_text:
-                    client.edit_message(message, text)
+                    client.edit_message(message, text, parse_mode="Markdown")
                     last_sent_text = text
             except TelegramError as exc:
                 print(f"[teltail] update loop error: {exc}", file=sys.stderr)
@@ -155,7 +156,7 @@ async def run_with_notifications(config: Config, argv: Iterable[str]) -> int:
     try:
         buffer_text = tail_buffer.get_full_text()
         final_text = live_builder.build_live_text(status, command_argv, buffer_text)
-        client.edit_message(message, final_text)
+        client.edit_message(message, final_text, parse_mode="Markdown")
     except TelegramError as exc:
         print(f"[teltail] failed to update final live message: {exc}", file=sys.stderr)
 
@@ -163,7 +164,7 @@ async def run_with_notifications(config: Config, argv: Iterable[str]) -> int:
     duration = time.time() - start_time
     try:
         summary = summary_builder.build_summary(status, command_argv, proc.returncode or 0, duration)
-        client.send_message(config.telegram.chat_id, summary)
+        client.send_message(config.telegram.chat_id, summary, parse_mode="Markdown")
     except TelegramError as exc:
         print(f"[teltail] failed to send summary message: {exc}", file=sys.stderr)
 
