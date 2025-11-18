@@ -64,7 +64,9 @@ class LiveMessageBuilder:
         skipped_bytes = max(0, total_bytes - shown_bytes)
 
         if skipped_lines <= 0 and skipped_bytes <= 0:
-            return "--- tail ---"
+            # Nothing skipped: show total instead.
+            unit = "line" if total_lines == 1 else "lines"
+            return f"total {total_lines} {unit}, {total_bytes} bytes"
 
         parts: list[str] = []
         if skipped_lines > 0:
@@ -92,34 +94,14 @@ class LiveMessageBuilder:
         command_line = " ".join(command_argv)
         cmd_block_text = "```bash\n" + command_line + "\n```"
 
-        # Provisional tail: we may adjust it after accounting for the
-        # information that we will place in the <pre> opening tag.
+        # Provisional tail based on tail_length budget. We'll compute stats for
+        # how much of the full buffer this represents.
         full_units = tg_len(buffer_text)
         tail_units_budget = min(full_units, self.defaults.tail_length)
         provisional_tail = tg_slice_tail(buffer_text, tail_units_budget)
 
-    # Compute skipped vs total stats based on full buffer vs tail.
-        total_lines = buffer_text.count("\n")
-        shown_lines = provisional_tail.count("\n")
-        skipped_lines = max(0, total_lines - shown_lines)
-
-        total_bytes = len(buffer_text.encode("utf-8", errors="replace"))
-        shown_bytes = len(provisional_tail.encode("utf-8", errors="replace"))
-        skipped_bytes = max(0, total_bytes - shown_bytes)
-
-        if skipped_lines > 0 or skipped_bytes > 0:
-            # Include how much was skipped.
-            parts: list[str] = []
-            if skipped_lines > 0:
-                unit = "line" if skipped_lines == 1 else "lines"
-                parts.append(f"{skipped_lines} {unit}")
-            if skipped_bytes > 0:
-                parts.append(f"{skipped_bytes} bytes")
-            tail_stats = "skipped " + ", ".join(parts)
-        else:
-            # Nothing skipped: show total instead.
-            unit = "line" if total_lines == 1 else "lines"
-            tail_stats = f"total {total_lines} {unit}, {total_bytes} bytes"
+        # Compute skipped vs total stats based on full buffer vs tail.
+        tail_stats = self._build_separator(buffer_text, provisional_tail)
 
         # Common prefix for all messages:
         #   ⏳ Running
