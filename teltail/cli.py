@@ -18,6 +18,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--chat-id", type=str, help="override Telegram chat id")
     parser.add_argument("--max-message-length", type=int, help="override max message length")
     parser.add_argument("--max-header-length", type=int, help="override max header length")
+    parser.add_argument("--max-tail-lines", type=int, help="override max tail lines (number of lines shown in tail block)")
     parser.add_argument("--tail-length", type=int, help="override tail length (in UTF-16 units)")
     parser.add_argument("--update-interval", type=float, help="override update interval in seconds")
     parser.add_argument("--merge-stderr", action="store_true", help="merge stderr into stdout stream")
@@ -43,6 +44,8 @@ def _apply_overrides(cfg, args) -> bool:
         d.max_message_length = args.max_message_length
     if args.max_header_length is not None:
         d.max_header_length = args.max_header_length
+    if args.max_tail_lines is not None:
+        d.max_tail_lines = args.max_tail_lines
     if args.tail_length is not None:
         d.tail_length = args.tail_length
     if args.update_interval is not None:

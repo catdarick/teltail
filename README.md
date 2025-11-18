@@ -76,8 +76,14 @@ teltail -- echo "hello from teltail"
 teltail echo "hello from teltail"
 ```
 
-Options are available to override configuration values for a single run. Run
-`teltail -h` for the full list.
+Options are available to override configuration values for a single run. 
+
+Example: limit the number of lines shown in the Telegram tail section for a noisy command:
+
+```bash
+teltail --max-tail-lines 20 -- find /var/log -type f -name "*.log"
+```
+Run `teltail -h` for the full options list.
 
 ## Development
 

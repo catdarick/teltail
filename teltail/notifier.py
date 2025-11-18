@@ -95,10 +95,17 @@ class LiveMessageBuilder:
         cmd_block_text = "```bash\n" + command_line + "\n```"
 
         # Provisional tail based on tail_length budget. We'll compute stats for
-        # how much of the full buffer this represents.
+        # how much of the full buffer this represents, and then optionally
+        # further constrain by max_tail_lines.
         full_units = tg_len(buffer_text)
         tail_units_budget = min(full_units, self.defaults.tail_length)
         provisional_tail = tg_slice_tail(buffer_text, tail_units_budget)
+
+        # Apply a lines-based cap for the provisional tail if configured.
+        if self.defaults.max_tail_lines is not None and self.defaults.max_tail_lines > 0:
+            lines = provisional_tail.splitlines(keepends=True)
+            if len(lines) > self.defaults.max_tail_lines:
+                provisional_tail = "".join(lines[-self.defaults.max_tail_lines :])
 
         # Compute skipped vs total stats based on full buffer vs tail.
         tail_stats = self._build_separator(buffer_text, provisional_tail)
@@ -147,6 +154,12 @@ class LiveMessageBuilder:
 
         tail_units = min(full_units, self.defaults.tail_length, available_for_body)
         body_tail = tg_slice_tail(buffer_text, tail_units)
+
+        # Enforce the same max_tail_lines constraint on the final body tail.
+        if self.defaults.max_tail_lines is not None and self.defaults.max_tail_lines > 0:
+            lines = body_tail.splitlines(keepends=True)
+            if len(lines) > self.defaults.max_tail_lines:
+                body_tail = "".join(lines[-self.defaults.max_tail_lines :])
         if tail_units > 0:
             return prefix + "```\n" + body_tail + "\n```"
 
