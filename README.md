@@ -5,6 +5,10 @@ terminal, and maintains a single live Telegram message with the header and tail
 of the output. When the command finishes, it edits the live message with the
 final status and sends a separate summary message.
 
+It's particularly useful for monitoring long-running tasks like model training,
+data processing, builds, or any other processes where you want to track progress
+remotely without staying connected to your terminal.
+
 ## Installation
 
 You can install `teltail` either globally for your user or in a project-local
@@ -62,7 +66,10 @@ user config.
 Run a command and mirror its output to Telegram:
 
 ```bash
-teltail -- python -m this
+teltail -- echo "hello from teltail"
+
+# or without the '--'
+teltail echo "hello from teltail"
 ```
 
 Options are available to override configuration values for a single run. Run
