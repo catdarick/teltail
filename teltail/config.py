@@ -44,6 +44,7 @@ class DefaultsConfig:
     emoji_running: str = "⏳"
     emoji_ok: str = "✅"
     emoji_error: str = "❌"
+    python_unbuffered: bool = True
 
 
 @dataclass
@@ -169,7 +170,8 @@ def load_config(explicit_path: Optional[Path] = None) -> Config:
         strip_ansi=_get_bool("strip_ansi", DefaultsConfig.strip_ansi),
         emoji_running=_get_str("emoji_running", DefaultsConfig.emoji_running),
         emoji_ok=_get_str("emoji_ok", DefaultsConfig.emoji_ok),
-        emoji_error=_get_str("emoji_error", DefaultsConfig.emoji_error),
+    emoji_error=_get_str("emoji_error", DefaultsConfig.emoji_error),
+    python_unbuffered=_get_bool("python_unbuffered", DefaultsConfig.python_unbuffered),
     )
 
     tg_cfg = TelegramConfig(bot_token=str(bot_token), chat_id=str(chat_id))
@@ -247,6 +249,7 @@ def run_configure(path: Path = DEFAULT_CONFIG_PATH) -> None:
     emoji_running = _prompt("emoji_running", default=defaults.emoji_running)
     emoji_ok = _prompt("emoji_ok", default=defaults.emoji_ok)
     emoji_error = _prompt("emoji_error", default=defaults.emoji_error)
+    python_unbuffered = _prompt_bool("python_unbuffered", defaults.python_unbuffered)
 
     config_dir = path.parent
     config_dir.mkdir(parents=True, exist_ok=True)
@@ -268,6 +271,7 @@ def run_configure(path: Path = DEFAULT_CONFIG_PATH) -> None:
     content += f"emoji_running = \"{emoji_running}\"\n"
     content += f"emoji_ok = \"{emoji_ok}\"\n"
     content += f"emoji_error = \"{emoji_error}\"\n"
+    content += f"python_unbuffered = {str(python_unbuffered).lower()}\n"
 
     # Write with 0600 permissions.
     with os.fdopen(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w") as f:

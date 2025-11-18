@@ -77,11 +77,21 @@ async def run_with_notifications(config: Config, argv: Iterable[str]) -> int:
     else:
         stderr_opt = PIPE
 
+    # Child environment: by default we set PYTHONUNBUFFERED=1 so that
+    # Python processes behave as if run with -u, which makes streaming
+    # output through teltail much more responsive. Users can disable this
+    # via the python_unbuffered default or by explicitly setting
+    # PYTHONUNBUFFERED in their environment.
+    env = os.environ.copy()
+    if defaults.python_unbuffered and "PYTHONUNBUFFERED" not in env:
+        env["PYTHONUNBUFFERED"] = "1"
+
     try:
         proc = await asyncio.create_subprocess_exec(
             *command_argv,
             stdout=PIPE,
             stderr=stderr_opt,
+            env=env,
         )
     except Exception as exc:
         print(f"[teltail] failed to start child process: {exc}", file=sys.stderr)

@@ -25,6 +25,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-merge-stderr", action="store_true", help="do not merge stderr into stdout stream")
     parser.add_argument("--strip-ansi", action="store_true", help="strip ANSI escape codes from Telegram output")
     parser.add_argument("--no-strip-ansi", action="store_true", help="do not strip ANSI escape codes")
+    parser.add_argument(
+        "--no-python-unbuffered",
+        action="store_true",
+        help="do not set PYTHONUNBUFFERED=1 in the child environment",
+    )
     parser.add_argument("--emoji-running", type=str, help="emoji for running state")
     parser.add_argument("--emoji-ok", type=str, help="emoji for success state")
     parser.add_argument("--emoji-error", type=str, help="emoji for error state")
@@ -50,6 +55,10 @@ def _apply_overrides(cfg, args) -> bool:
         d.tail_length = args.tail_length
     if args.update_interval is not None:
         d.update_interval_secs = args.update_interval
+
+    # Python unbuffered override: default is True, user can disable it.
+    if args.no_python_unbuffered:
+        d.python_unbuffered = False
 
     if args.merge_stderr and args.no_merge_stderr:
         print("[teltail] cannot specify both --merge-stderr and --no-merge-stderr", file=sys.stderr)
