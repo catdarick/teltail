@@ -104,7 +104,16 @@ def main(argv: list[str] | None = None) -> int:
     if not _apply_overrides(cfg, args):
         return 1
 
+    # ``cmd`` captures everything after the first non-option argument.
+    # Support both styles:
+    #   teltail echo hello
+    #   teltail -- echo hello
+    # In the second case argparse.REMAINDER includes the leading "--";
+    # strip a single leading "--" if present so the child command starts
+    # with the actual program name.
     cmd = args.cmd
+    if cmd and cmd[0] == "--":
+        cmd = cmd[1:]
     if not cmd:
         print("[teltail] usage: teltail [options] -- <command> [args...]", file=sys.stderr)
         return 1
