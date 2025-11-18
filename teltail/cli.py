@@ -32,7 +32,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _apply_overrides(cfg, args) -> None:
+def _apply_overrides(cfg, args) -> bool:
     # Telegram overrides
     if args.chat_id:
         cfg.telegram.chat_id = args.chat_id
@@ -50,6 +50,7 @@ def _apply_overrides(cfg, args) -> None:
 
     if args.merge_stderr and args.no_merge_stderr:
         print("[teltail] cannot specify both --merge-stderr and --no-merge-stderr", file=sys.stderr)
+        return False
     elif args.merge_stderr:
         d.merge_stderr = True
     elif args.no_merge_stderr:
@@ -57,6 +58,7 @@ def _apply_overrides(cfg, args) -> None:
 
     if args.strip_ansi and args.no_strip_ansi:
         print("[teltail] cannot specify both --strip-ansi and --no-strip-ansi", file=sys.stderr)
+        return False
     elif args.strip_ansi:
         d.strip_ansi = True
     elif args.no_strip_ansi:
@@ -68,6 +70,7 @@ def _apply_overrides(cfg, args) -> None:
         d.emoji_ok = args.emoji_ok
     if args.emoji_error is not None:
         d.emoji_error = args.emoji_error
+    return True
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -98,7 +101,8 @@ def main(argv: list[str] | None = None) -> int:
         print("[teltail] run 'teltail --configure' to create or fix the config", file=sys.stderr)
         return 1
 
-    _apply_overrides(cfg, args)
+    if not _apply_overrides(cfg, args):
+        return 1
 
     cmd = args.cmd
     if not cmd:

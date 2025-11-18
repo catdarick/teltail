@@ -70,8 +70,10 @@ async def run_with_notifications(config: Config, argv: Iterable[str]) -> int:
         return 1
 
     # Only now start the child process.
+    # If merge_stderr is enabled, forward stderr into stdout so we only
+    # have a single combined stream to read from.
     if defaults.merge_stderr:
-        stderr_opt = PIPE
+        stderr_opt = asyncio.subprocess.STDOUT
     else:
         stderr_opt = PIPE
 
@@ -131,14 +133,13 @@ async def run_with_notifications(config: Config, argv: Iterable[str]) -> int:
                 print(f"[teltail] unexpected update loop error: {exc}", file=sys.stderr)
                 break
 
-    # Reader tasks.
+    # Reader tasks. When stderr is merged into stdout we only need to read
+    # a single combined stream.
     stdout_task = asyncio.create_task(
         _read_stream(proc.stdout, tail_buffer, is_stderr=False, strip_ansi=defaults.strip_ansi)  # type: ignore[arg-type]
     )
     if defaults.merge_stderr:
-        stderr_task = asyncio.create_task(
-            _read_stream(proc.stderr, tail_buffer, is_stderr=True, strip_ansi=defaults.strip_ansi)  # type: ignore[arg-type]
-        )
+        stderr_task = None
     else:
         stderr_task = asyncio.create_task(
             _read_stream(proc.stderr, tail_buffer, is_stderr=True, strip_ansi=defaults.strip_ansi)  # type: ignore[arg-type]
@@ -149,7 +150,8 @@ async def run_with_notifications(config: Config, argv: Iterable[str]) -> int:
     # Wait for process completion.
     await proc.wait()
     await stdout_task
-    await stderr_task
+    if stderr_task is not None:
+        await stderr_task
 
     # Determine final status and edit live message.
     status = "success" if proc.returncode == 0 else "error"
