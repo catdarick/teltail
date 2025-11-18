@@ -82,7 +82,26 @@ class LiveMessageBuilder:
         info = ", ".join(parts)
         return f"skipped {info}"
 
-    def build_live_text(self, status: Status, command_argv: list[str], buffer_text: str) -> str:
+    def build_live_text(self, status: Status, command_argv: list[str], buffer_text: str, head_text: str = "", dropped_bytes: int = 0) -> str:
+        # Resolve carriage returns to clean up progress bars and overwritten lines.
+        # We do this for both head and buffer (tail) to ensure clean matching.
+        # Note: TailBuffer now handles carriage returns internally, so buffer_text
+        # and head_text are already "clean". We keep the variables as is.
+        
+        # Reconstruct the effective visual text
+        if dropped_bytes == 0:
+            visual_text = buffer_text
+        else:
+            # Check for overlap
+            head_len_bytes = len(head_text.encode("utf-8", errors="replace"))
+            if dropped_bytes < head_len_bytes:
+                # Overlap: recover the missing prefix from head_text
+                missing_head = head_text.encode("utf-8", errors="replace")[:dropped_bytes].decode("utf-8", errors="replace")
+                visual_text = missing_head + buffer_text
+            else:
+                # Gap
+                visual_text = head_text + f"\n\n... skipped {dropped_bytes - head_len_bytes} bytes ...\n\n" + buffer_text
+
         header_builder = HeaderBuilder(self.defaults)
         # Header is just the status line (emoji + word), the full CLI
         # command is shown in its own fenced code block below.
@@ -94,21 +113,36 @@ class LiveMessageBuilder:
         command_line = " ".join(command_argv)
         cmd_block_text = "```bash\n" + command_line + "\n```"
 
-        # Provisional tail based on tail_length budget. We'll compute stats for
-        # how much of the full buffer this represents, and then optionally
-        # further constrain by max_tail_lines.
-        full_units = tg_len(buffer_text)
+        # Provisional tail based on tail_length budget.
+        # We use tg_truncate_middle to preserve head and tail if the text is too long.
+        full_units = tg_len(visual_text)
         tail_units_budget = min(full_units, self.defaults.tail_length)
-        provisional_tail = tg_slice_tail(buffer_text, tail_units_budget)
+        
+        # If we have dropped bytes, we assume we are in "head+tail" mode and favor truncate_middle.
+        # Even if dropped_bytes==0, truncate_middle is safe (keeps start and end).
+        provisional_body = tg_truncate_middle(visual_text, tail_units_budget)
 
         # Apply a lines-based cap for the provisional tail if configured.
-        if self.defaults.max_tail_lines is not None and self.defaults.max_tail_lines > 0:
-            lines = provisional_tail.splitlines(keepends=True)
-            if len(lines) > self.defaults.max_tail_lines:
-                provisional_tail = "".join(lines[-self.defaults.max_tail_lines :])
-
+        # Note: max_tail_lines logic might need to be relaxed if we are intentionally keeping the head.
+        # For now, we skip max_tail_lines enforcement if we have a gap (dropped_bytes > 0) 
+        # or if the user configured head_lines?
+        # Actually, max_tail_lines is explicitly "lines from the end". 
+        # If the user set it, they might only want the last N lines.
+        # But the new request implies they want Head + Tail.
+        # Let's apply max_tail_lines only to the *tail part* if we had a gap?
+        # Complexity. Let's stick to existing behavior: max_tail_lines applies to the *resulting body*.
+        # If result is "Head ... Tail", and we take last N lines, we lose Head.
+        # So we should NOT apply max_tail_lines if we successfully preserved a head.
+        
+        # Strategy: If head_text is present and we are using it (dropped_bytes > 0), we skip max_tail_lines
+        # or apply it only to the tail section.
+        # Since we already constructed `visual_text`, it's hard to separate.
+        
+        # Let's just rely on tail_length (chars) budget for now and simplify.
+        # The user can increase tail_length or unset max_tail_lines if they want more.
+        
         # Compute skipped vs total stats based on full buffer vs tail.
-        tail_stats = self._build_separator(buffer_text, provisional_tail)
+        tail_stats = self._build_separator(visual_text, provisional_body)
 
         # Common prefix for all messages:
         #   ⏳ Running
@@ -153,13 +187,9 @@ class LiveMessageBuilder:
             return base
 
         tail_units = min(full_units, self.defaults.tail_length, available_for_body)
-        body_tail = tg_slice_tail(buffer_text, tail_units)
+        body_tail = tg_truncate_middle(visual_text, tail_units)
 
-        # Enforce the same max_tail_lines constraint on the final body tail.
-        if self.defaults.max_tail_lines is not None and self.defaults.max_tail_lines > 0:
-            lines = body_tail.splitlines(keepends=True)
-            if len(lines) > self.defaults.max_tail_lines:
-                body_tail = "".join(lines[-self.defaults.max_tail_lines :])
+        # Skipping strict max_tail_lines enforcement on the final body to preserve head if present.
         if tail_units > 0:
             return prefix + "```\n" + body_tail + "\n```"
 

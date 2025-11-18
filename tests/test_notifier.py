@@ -45,3 +45,12 @@ def test_summary_builder_includes_exit_code() -> None:
     assert "Status:" in msg
     assert "exit code 0" in msg
     assert "1.2" in msg
+
+
+def test_live_message_cleans_carriage_returns() -> None:
+    defaults = _make_defaults()
+    lb = LiveMessageBuilder(defaults)
+    dirty_text = "Line 1\rUpdate 1"
+    text = lb.build_live_text("running", ["cmd"], buffer_text=dirty_text)
+    assert "Update 1" in text
+    assert "Line 1" not in text

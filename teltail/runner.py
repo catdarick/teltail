@@ -12,27 +12,19 @@ from typing import Iterable, Optional
 
 from .config import Config
 from .notifier import HeaderBuilder, LiveMessageBuilder, SummaryBuilder
+from .string_utils import strip_ansi
 from .tail_buffer import TailBuffer
 from .telegram_client import TelegramClient, TelegramError, TelegramMessage
 
 
-def _strip_ansi(text: str) -> str:
-    import re
-
-    ansi_escape = re.compile(
-        r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])"
-    )
-    return ansi_escape.sub("", text)
-
-
-async def _read_stream(stream: asyncio.StreamReader, buffer: TailBuffer, is_stderr: bool, strip_ansi: bool) -> None:
+async def _read_stream(stream: asyncio.StreamReader, buffer: TailBuffer, is_stderr: bool, do_strip_ansi: bool) -> None:
     while True:
         chunk = await stream.read(4096)
         if not chunk:
             break
         text = chunk.decode("utf-8", errors="replace")
-        if strip_ansi:
-            text = _strip_ansi(text)
+        if do_strip_ansi:
+            text = strip_ansi(text)
         # Echo to local terminal.
         target = sys.stderr if is_stderr else sys.stdout
         target.write(text)
@@ -103,7 +95,7 @@ async def run_with_notifications(config: Config, argv: Iterable[str]) -> int:
             pass
         return 1
 
-    tail_buffer = TailBuffer()
+    tail_buffer = TailBuffer(head_lines=defaults.head_lines)
 
     loop = asyncio.get_running_loop()
 
@@ -132,7 +124,16 @@ async def run_with_notifications(config: Config, argv: Iterable[str]) -> int:
                 break
             try:
                 buffer_text = tail_buffer.get_full_text()
-                text = live_builder.build_live_text("running", command_argv, buffer_text)
+                head_text = tail_buffer.get_head_text()
+                dropped_bytes = tail_buffer.dropped_bytes
+                
+                text = live_builder.build_live_text(
+                    "running", 
+                    command_argv, 
+                    buffer_text,
+                    head_text=head_text,
+                    dropped_bytes=dropped_bytes
+                )
                 if text != last_sent_text:
                     client.edit_message(message, text, parse_mode="Markdown")
                     last_sent_text = text
@@ -146,13 +147,13 @@ async def run_with_notifications(config: Config, argv: Iterable[str]) -> int:
     # Reader tasks. When stderr is merged into stdout we only need to read
     # a single combined stream.
     stdout_task = asyncio.create_task(
-        _read_stream(proc.stdout, tail_buffer, is_stderr=False, strip_ansi=defaults.strip_ansi)  # type: ignore[arg-type]
+        _read_stream(proc.stdout, tail_buffer, is_stderr=False, do_strip_ansi=defaults.strip_ansi)  # type: ignore[arg-type]
     )
     if defaults.merge_stderr:
         stderr_task = None
     else:
         stderr_task = asyncio.create_task(
-            _read_stream(proc.stderr, tail_buffer, is_stderr=True, strip_ansi=defaults.strip_ansi)  # type: ignore[arg-type]
+            _read_stream(proc.stderr, tail_buffer, is_stderr=True, do_strip_ansi=defaults.strip_ansi)  # type: ignore[arg-type]
         )
 
     update_task = asyncio.create_task(_update_loop())
@@ -167,7 +168,16 @@ async def run_with_notifications(config: Config, argv: Iterable[str]) -> int:
     status = "success" if proc.returncode == 0 else "error"
     try:
         buffer_text = tail_buffer.get_full_text()
-        final_text = live_builder.build_live_text(status, command_argv, buffer_text)
+        head_text = tail_buffer.get_head_text()
+        dropped_bytes = tail_buffer.dropped_bytes
+        
+        final_text = live_builder.build_live_text(
+            status, 
+            command_argv, 
+            buffer_text,
+            head_text=head_text,
+            dropped_bytes=dropped_bytes
+        )
         client.edit_message(message, final_text, parse_mode="Markdown")
     except TelegramError as exc:
         print(f"[teltail] failed to update final live message: {exc}", file=sys.stderr)
