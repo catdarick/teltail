@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "teltail"
+version = "0.1.0"
+description = "Run a command and mirror its tail to Telegram in a single live message."
+requires-python = ">=3.10"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [{name = "teltail user"}]
+
+[project.scripts]
+teltail = "teltail.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["teltail"]
