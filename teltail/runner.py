@@ -95,7 +95,7 @@ async def run_with_notifications(config: Config, argv: Iterable[str]) -> int:
             pass
         return 1
 
-    tail_buffer = TailBuffer(head_lines=defaults.head_lines)
+    tail_buffer = TailBuffer()
 
     loop = asyncio.get_running_loop()
 
@@ -124,14 +124,12 @@ async def run_with_notifications(config: Config, argv: Iterable[str]) -> int:
                 break
             try:
                 buffer_text = tail_buffer.get_full_text()
-                head_text = tail_buffer.get_head_text()
                 dropped_bytes = tail_buffer.dropped_bytes
                 
                 text = live_builder.build_live_text(
                     "running", 
                     command_argv, 
                     buffer_text,
-                    head_text=head_text,
                     dropped_bytes=dropped_bytes
                 )
                 if text != last_sent_text:
@@ -168,14 +166,12 @@ async def run_with_notifications(config: Config, argv: Iterable[str]) -> int:
     status = "success" if proc.returncode == 0 else "error"
     try:
         buffer_text = tail_buffer.get_full_text()
-        head_text = tail_buffer.get_head_text()
         dropped_bytes = tail_buffer.dropped_bytes
         
         final_text = live_builder.build_live_text(
             status, 
             command_argv, 
             buffer_text,
-            head_text=head_text,
             dropped_bytes=dropped_bytes
         )
         client.edit_message(message, final_text, parse_mode="Markdown")

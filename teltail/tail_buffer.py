@@ -12,22 +12,20 @@ from collections import deque
 
 
 class TailBuffer:
-    """A smart rolling text buffer that handles carriage returns and head preservation.
+    """A smart rolling text buffer that handles carriage returns.
     
     This buffer acts like a simple terminal:
     - ``\\n`` commits the current line.
     - ``\\r`` returns the cursor to the start of the current line, allowing overwrites.
     
     It maintains a rolling window of the *resultant* lines, keeping total size
-    under *max_bytes*. It also preserves the first *head_lines* of output
-    indefinitely to keep the context (like startup logs) visible.
+    under *max_bytes*.
     """
 
-    def __init__(self, max_bytes: int = 200_000, head_lines: int = 0) -> None:
+    def __init__(self, max_bytes: int = 200_000) -> None:
         if max_bytes <= 0:
             raise ValueError("max_bytes must be positive")
         self._max_bytes = max_bytes
-        self._head_lines_limit = head_lines
         
         # Buffer state
         self._lines: deque[str] = deque()  # Completed lines (including newline chars)
@@ -35,10 +33,6 @@ class TailBuffer:
         
         self._working_chars: list[str] = [] # Current line being built
         self._cursor: int = 0               # Cursor position in _working_chars
-        
-        # Head preservation
-        self._head_lines: list[str] = []   # Frozen head lines
-        self._head_frozen = False
         
         # Stats
         self._dropped_bytes: int = 0       # Bytes of *completed lines* dropped from front
@@ -97,14 +91,6 @@ class TailBuffer:
         encoded_len = len(line_str.encode("utf-8", errors="replace"))
         self._lines_size_bytes += encoded_len
         
-        # Handle head preservation
-        if self._head_lines_limit > 0 and not self._head_frozen:
-            self._head_lines.append(line_str)
-            if len(self._head_lines) >= self._head_lines_limit:
-                self._head_frozen = True
-                # Trim excess if we somehow overshot (unlikely with line-by-line)
-                self._head_lines = self._head_lines[:self._head_lines_limit]
-
         # Reset working state
         self._working_chars = []
         self._cursor = 0
@@ -125,9 +111,3 @@ class TailBuffer:
         tail = "".join(self._lines)
         current = "".join(self._working_chars)
         return tail + current
-
-    def get_head_text(self) -> str:
-        """Return the captured head lines."""
-        if self._head_lines_limit <= 0:
-            return ""
-        return "".join(self._head_lines)

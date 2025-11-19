@@ -38,7 +38,6 @@ class DefaultsConfig:
     max_header_length: int = 256
     max_tail_lines: int = 200
     tail_length: int = 3000
-    head_lines: int = 50
     update_interval_secs: float = 3.0
     merge_stderr: bool = True
     strip_ansi: bool = True
@@ -166,7 +165,6 @@ def load_config(explicit_path: Optional[Path] = None) -> Config:
         max_header_length=_get_int("max_header_length", DefaultsConfig.max_header_length),
         max_tail_lines=_get_int("max_tail_lines", DefaultsConfig.max_tail_lines),
         tail_length=_get_int("tail_length", DefaultsConfig.tail_length),
-        head_lines=_get_int("head_lines", DefaultsConfig.head_lines),
         update_interval_secs=_get_float("update_interval_secs", DefaultsConfig.update_interval_secs),
         merge_stderr=_get_bool("merge_stderr", DefaultsConfig.merge_stderr),
         strip_ansi=_get_bool("strip_ansi", DefaultsConfig.strip_ansi),
@@ -244,7 +242,6 @@ def run_configure(path: Path = DEFAULT_CONFIG_PATH) -> None:
     max_header_length = _prompt_int("max_header_length", defaults.max_header_length)
     tail_length = _prompt_int("tail_length", defaults.tail_length)
     max_tail_lines = _prompt_int("max_tail_lines", defaults.max_tail_lines)
-    head_lines = _prompt_int("head_lines", defaults.head_lines)
     update_interval_secs = _prompt_float("update_interval_secs", defaults.update_interval_secs)
     merge_stderr = _prompt_bool("merge_stderr", defaults.merge_stderr)
     strip_ansi = _prompt_bool("strip_ansi", defaults.strip_ansi)
@@ -268,7 +265,6 @@ def run_configure(path: Path = DEFAULT_CONFIG_PATH) -> None:
     content += f"max_header_length = {max_header_length}\n"
     content += f"tail_length = {tail_length}\n"
     content += f"max_tail_lines = {max_tail_lines}\n"
-    content += f"head_lines = {head_lines}\n"
     content += f"update_interval_secs = {update_interval_secs}\n"
     content += f"merge_stderr = {str(merge_stderr).lower()}\n"
     content += f"strip_ansi = {str(strip_ansi).lower()}\n"
