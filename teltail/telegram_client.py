@@ -18,6 +18,12 @@ class TelegramError(Exception):
     pass
 
 
+class TelegramRateLimitError(TelegramError):
+    def __init__(self, message: str, retry_after: int | None = None) -> None:
+        super().__init__(message)
+        self.retry_after = retry_after
+
+
 @dataclass
 class TelegramMessage:
     chat_id: str
@@ -40,6 +46,17 @@ class TelegramClient:
         try:
             with urllib.request.urlopen(req, timeout=self._timeout) as resp:
                 raw = resp.read().decode("utf-8", errors="replace")
+        except urllib.error.HTTPError as exc:
+            if exc.code == 429:
+                try:
+                    err_raw = exc.read().decode("utf-8", errors="replace")
+                    err_payload = json.loads(err_raw)
+                    retry_after = err_payload.get("parameters", {}).get("retry_after")
+                    msg = f"Too Many Requests: retry after {retry_after}"
+                    raise TelegramRateLimitError(msg, retry_after=retry_after) from exc
+                except (json.JSONDecodeError, AttributeError):
+                    pass
+            raise TelegramError(f"network error calling {method}: {exc}") from exc
         except urllib.error.URLError as exc:  # pragma: no cover - network
             raise TelegramError(f"network error calling {method}: {exc}") from exc
 

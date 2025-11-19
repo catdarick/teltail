@@ -14,7 +14,7 @@ from .config import Config
 from .notifier import HeaderBuilder, LiveMessageBuilder, SummaryBuilder
 from .string_utils import strip_ansi
 from .tail_buffer import TailBuffer
-from .telegram_client import TelegramClient, TelegramError, TelegramMessage
+from .telegram_client import TelegramClient, TelegramError, TelegramMessage, TelegramRateLimitError
 
 
 async def _read_stream(stream: asyncio.StreamReader, buffer: TailBuffer, is_stderr: bool, do_strip_ansi: bool) -> None:
@@ -135,6 +135,11 @@ async def run_with_notifications(config: Config, argv: Iterable[str]) -> int:
                 if text != last_sent_text:
                     client.edit_message(message, text, parse_mode="Markdown")
                     last_sent_text = text
+            except TelegramRateLimitError as exc:
+                print(f"[teltail] rate limit in loop: {exc}", file=sys.stderr)
+                # If rate limited, wait a bit extra if reasonable.
+                if exc.retry_after and exc.retry_after < 120:
+                    await asyncio.sleep(exc.retry_after)
             except TelegramError as exc:
                 print(f"[teltail] update loop error: {exc}", file=sys.stderr)
                 break
@@ -177,6 +182,9 @@ async def run_with_notifications(config: Config, argv: Iterable[str]) -> int:
         client.edit_message(message, final_text, parse_mode="Markdown")
     except TelegramError as exc:
         print(f"[teltail] failed to update final live message: {exc}", file=sys.stderr)
+
+    # Small delay to avoid hitting rate limits with the subsequent summary message
+    await asyncio.sleep(1.0)
 
     # Final summary message.
     duration = time.time() - start_time
